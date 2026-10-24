@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: urumi
+    env: docker
+    plan: free
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: PORT
+        value: 10000
+      # Required for gateway
+      - key: GATEWAY_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////app/data/gateway.db
+      # Assessment/demo mode - keep disabled by default
+      - key: GATEWAY_DEMO_MODE
+        value: false
+      - key: GATEWAY_DEMO_ACK
+        value: false
+      - key: GATEWAY_DEPLOYMENT_ENV
+        value: development
+      - key: GATEWAY_DEMO_ALLOW_REMOTE
+        value: false
+      # WooCommerce (optional - without them, WooCommerce MCP will report not ready)
+      - key: WOOCOMMERCE_BASE_URL
+        sync: false
+      - key: WOOCOMMERCE_CONSUMER_KEY
+        sync: false
+      - key: WOOCOMMERCE_CONSUMER_SECRET
+        sync: false
+      - key: WOOCOMMERCE_AUTH_MODE
+        value: auto
+      # Agent
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: AGENT_GATEWAY_MCP_URL
+        value: http://127.0.0.1:8000/mcp
+      # Logging
+      - key: LOG_LEVEL
+        value: INFO
+      # Shipping mock
+      - key: SHIPPING_MOCK_MODE
+        value: simulated
+      - key: SHIPPING_DATABASE_URL
+        value: sqlite+aiosqlite:////app/data/shipping.db

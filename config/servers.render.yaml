@@ -1,0 +1,24 @@
+servers:
+  - id: woocommerce
+    name: WooCommerce MCP
+    description: Products and orders via the WooCommerce REST API.
+    transport: streamable-http
+    url: http://127.0.0.1:8101/mcp
+    health_url: http://127.0.0.1:8101/health/ready
+    enabled: true
+
+  - id: inventory
+    name: Inventory MCP
+    description: Stock lookup, low-stock detection, inventory summaries, reorder recommendations.
+    transport: streamable-http
+    url: http://127.0.0.1:8102/mcp
+    health_url: http://127.0.0.1:8102/health/ready
+    enabled: true
+
+  - id: shipping
+    name: Shipping and Fulfillment MCP
+    description: Shipment records, tracking status, pending fulfillments (mock provider).
+    transport: streamable-http
+    url: http://127.0.0.1:8103/mcp
+    health_url: http://127.0.0.1:8103/health/ready
+    enabled: true
