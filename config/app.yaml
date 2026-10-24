@@ -1,0 +1,43 @@
+# Application-wide settings for Urumi MCP Gateway.
+# Secrets are NOT stored here — they come from environment variables (see .env.example).
+
+app:
+  name: urumi-mcp-gateway
+  environment: development        # development | staging | production
+  log_level: info
+
+llm:
+  provider: google-genai
+  model: ${GEMINI_MODEL}          # overridable via env without code changes
+  temperature: 0.2
+  max_output_tokens: 2048
+
+langsmith:
+  tracing_enabled: ${LANGSMITH_TRACING}   # set false to disable tracing entirely
+  project: ${LANGSMITH_PROJECT}
+  endpoint: ${LANGSMITH_ENDPOINT}
+
+agent:
+  # Chat agent runtime. It connects to the gateway as an MCP client; the
+  # gateway still enforces authentication/authorization on every tool call.
+  gateway_mcp_url: ${AGENT_GATEWAY_MCP_URL}
+  max_iterations: 6
+  max_tool_calls: 8
+  max_history_messages: 20
+  business_timezone: UTC
+  system_prompt_path: config/prompts/chat_agent.txt
+
+database:
+  url: ${DATABASE_URL}            # sqlite for local dev; postgresql for later stages
+
+gateway:
+  host: ${GATEWAY_HOST}
+  port: ${GATEWAY_PORT}
+  # AuthN/AuthZ are enforced per tool call; audit logging is always on.
+  audit_enabled: true
+  # Tools listed here are callable via the gateway but hidden from the model's tool list.
+  # They still require authentication and permission checks.
+  model_hidden_tools: []
+
+# Shipping mock settings live in config/mcp_services.yaml (`shipping_mock`),
+# which takes precedence over this file.

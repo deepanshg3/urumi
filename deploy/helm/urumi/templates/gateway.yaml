@@ -1,0 +1,142 @@
+{{- if .Values.gateway.enabled }}
+{{- $demoEnv := .Values.gateway.env | default dict }}
+{{- if and (eq (toString (get $demoEnv "GATEWAY_DEMO_MODE")) "true") (ne (toString (get $demoEnv "GATEWAY_DEMO_ACK")) "true") }}
+{{- fail "GATEWAY_DEMO_MODE=true requires GATEWAY_DEMO_ACK=true (assessment deployments only)" }}
+{{- end }}
+{{- $full := include "urumi.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-gateway
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "urumi.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: {{ .Values.gateway.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-gateway
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "urumi.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "urumi.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/servers: {{ include (print $.Template.BasePath "/configmap-servers.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      {{- if and .Values.database.bundled (not .Values.database.url) }}
+      initContainers:
+        - name: wait-for-database
+          image: {{ include "urumi.image" (list . .Values.database.image) }}
+          command:
+            - sh
+            - -c
+            - >-
+              until pg_isready -h {{ $full }}-postgres -p 5432
+              -U {{ .Values.database.auth.username }}; do echo waiting for database; sleep 2; done
+      {{- end }}
+      containers:
+        - name: gateway
+          image: {{ include "urumi.image" (list . .Values.gateway.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: GATEWAY_HOST
+              value: 0.0.0.0
+            - name: GATEWAY_PORT
+              value: "8000"
+            - name: GATEWAY_SERVERS_CONFIG
+              value: /app/config/servers.yaml
+            {{- if and .Values.database.bundled (not .Values.database.url) }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: postgres-password
+            {{- end }}
+            - name: DATABASE_URL
+              value: {{ include "urumi.databaseUrl" . | quote }}
+            - name: GATEWAY_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: gateway-secret-key
+            - name: BOOTSTRAP_ADMIN_EMAIL
+              value: {{ .Values.gateway.bootstrapAdmin.email | quote }}
+            - name: BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: bootstrap-admin-password
+            - name: GATEWAY_ALLOWED_UPSTREAM_HOSTS
+              value: {{ include "urumi.upstreamHosts" . | quote }}
+            - name: GATEWAY_CORS_ORIGINS
+              value: {{ include "urumi.corsOrigins" . | quote }}
+            - name: GATEWAY_ALLOWED_HOSTS
+              value: "{{ $full }}-gateway,{{ $full }}-gateway:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*{{- if .Values.ingress.enabled }},{{ .Values.ingress.host }}{{ end }}"
+            - name: GATEWAY_REFRESH_INTERVAL_SECONDS
+              value: "30"
+            - name: GATEWAY_AUDIT_ENABLED
+              value: "true"
+            - name: LOG_LEVEL
+              value: {{ .Values.gateway.logLevel | default "INFO" | quote }}
+            {{- range $key, $value := .Values.gateway.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          volumeMounts:
+            - name: servers-config
+              mountPath: /app/config/servers.yaml
+              subPath: servers.yaml
+      volumes:
+        - name: servers-config
+          configMap:
+            name: {{ $full }}-servers
+{{- end }}

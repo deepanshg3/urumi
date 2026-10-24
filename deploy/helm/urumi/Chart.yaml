@@ -1,0 +1,16 @@
+apiVersion: v2
+name: urumi
+description: >-
+  Urumi MCP Gateway platform: central gateway, Gemini chat agent, dashboard,
+  custom WooCommerce/Inventory/Shipping MCP servers, and an optional bundled
+  WooCommerce store (WordPress + MariaDB) plus an in-cluster PostgreSQL.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - mcp
+  - gateway
+  - woocommerce
+  - ai
+maintainers:
+  - name: Urumi

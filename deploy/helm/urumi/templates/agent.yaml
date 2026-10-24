@@ -1,0 +1,133 @@
+{{- if .Values.agent.enabled }}
+{{- $full := include "urumi.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-agent
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  type: {{ .Values.agent.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "urumi.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: agent
+  ports:
+    - name: http
+      port: {{ .Values.agent.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-agent
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  replicas: {{ .Values.agent.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "urumi.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "urumi.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: agent
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      {{- if and .Values.database.bundled (not .Values.database.url) }}
+      initContainers:
+        - name: wait-for-database
+          image: {{ include "urumi.image" (list . .Values.database.image) }}
+          command:
+            - sh
+            - -c
+            - >-
+              until pg_isready -h {{ $full }}-postgres -p 5432
+              -U {{ .Values.database.auth.username }}; do echo waiting for database; sleep 2; done
+      {{- end }}
+      containers:
+        - name: agent
+          image: {{ include "urumi.image" (list . .Values.agent.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8200
+          env:
+            - name: AGENT_HOST
+              value: 0.0.0.0
+            - name: AGENT_PORT
+              value: "8200"
+            - name: AGENT_GATEWAY_MCP_URL
+              value: "http://{{ $full }}-gateway:8000/mcp"
+            {{- if and .Values.database.bundled (not .Values.database.url) }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: postgres-password
+            {{- end }}
+            - name: DATABASE_URL
+              value: {{ include "urumi.databaseUrl" . | quote }}
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: gemini-api-key
+            - name: GEMINI_MODEL
+              value: {{ .Values.agent.gemini.model | quote }}
+            - name: GEMINI_TEMPERATURE
+              value: {{ .Values.agent.gemini.temperature | quote }}
+            - name: GEMINI_MAX_OUTPUT_TOKENS
+              value: {{ .Values.agent.gemini.maxOutputTokens | quote }}
+            - name: GEMINI_REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.agent.gemini.requestTimeoutSeconds | quote }}
+            - name: LANGSMITH_TRACING
+              value: {{ .Values.agent.langsmith.enabled | quote }}
+            - name: LANGSMITH_PROJECT
+              value: {{ .Values.agent.langsmith.project | quote }}
+            - name: LANGSMITH_ENDPOINT
+              value: {{ .Values.agent.langsmith.endpoint | quote }}
+            - name: LANGSMITH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: langsmith-api-key
+            - name: AGENT_CORS_ORIGINS
+              value: {{ include "urumi.corsOrigins" . | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.agent.logLevel | default "INFO" | quote }}
+            {{- range $key, $value := .Values.agent.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,106 @@
+{{- if .Values.inventoryMcp.enabled }}
+{{- $full := include "urumi.fullname" . -}}
+{{- $storeUrl := "" -}}
+{{- if .Values.woocommerce.enabled -}}{{- $storeUrl = printf "http://%s-wordpress:80" $full -}}{{- else -}}{{- $storeUrl = .Values.inventoryMcp.env.WOOCOMMERCE_BASE_URL | default "" -}}{{- end -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-inventory-mcp
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: inventory-mcp
+spec:
+  selector:
+    app.kubernetes.io/name: {{ include "urumi.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: inventory-mcp
+  ports:
+    - name: http
+      port: 8102
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-inventory-mcp
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: inventory-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "urumi.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: inventory-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "urumi.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: inventory-mcp
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      containers:
+        - name: inventory-mcp
+          image: {{ include "urumi.image" (list . .Values.inventoryMcp.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8102
+          env:
+            - name: INVENTORY_MCP_HOST
+              value: 0.0.0.0
+            - name: INVENTORY_MCP_PORT
+              value: "8102"
+            - name: WOOCOMMERCE_BASE_URL
+              value: {{ $storeUrl | quote }}
+            - name: WOOCOMMERCE_SIGNING_BASE_URL
+              value: {{ if .Values.woocommerce.enabled }}{{ .Values.woocommerce.publicUrl | default $storeUrl | quote }}{{ else }}{{ $storeUrl | quote }}{{ end }}
+            - name: WOOCOMMERCE_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: woocommerce-consumer-key
+            - name: WOOCOMMERCE_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: woocommerce-consumer-secret
+            - name: INVENTORY_LOW_STOCK_THRESHOLD
+              value: {{ .Values.inventoryMcp.lowStockThreshold | quote }}
+            - name: MCP_ALLOWED_HOSTS
+              value: "{{ $full }}-inventory-mcp,{{ $full }}-inventory-mcp:*,localhost:*,127.0.0.1:*"
+            - name: LOG_LEVEL
+              value: {{ .Values.inventoryMcp.logLevel | default "INFO" | quote }}
+            {{- range $key, $value := .Values.inventoryMcp.env }}
+            {{- if ne $key "WOOCOMMERCE_BASE_URL" }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.inventoryMcp.resources | nindent 12 }}
+{{- end }}

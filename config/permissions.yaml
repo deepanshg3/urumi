@@ -1,0 +1,88 @@
+# Role-based access control for gateway tool calls.
+# Enforced by the gateway on EVERY tool call — including direct calls to tools
+# that are hidden from the model's tool list (see gateway.model_hidden_tools).
+#
+# Tool permissions use `tools:<server_id>:<upstream_tool_name>`, matching the
+# public gateway name `<server_id>__<upstream_tool_name>` (the separator differs
+# so a literal '*' wildcard is unambiguous). Deny rules win over grants.
+#
+# Three roles are shipped:
+#   admin  — Super Admin: full tool access plus gateway administration.
+#   member — Operator: day-to-day store operations (may update shipment
+#            status), read-only elsewhere, no gateway administration.
+#   viewer — Read-only observer: may look, may not change anything.
+#
+# Gateway-management permissions (not tool permissions) live in the
+# `gateway:<area>:<action>` namespace:
+#   gateway:servers:manage      create/update/enable/refresh upstream servers
+#   gateway:keys:manage          issue/revoke API keys for any account
+#   gateway:keys:manage:own      issue/revoke API keys for the caller's account
+#   gateway:keys:read            list API keys (own account)
+#   gateway:users:manage         create/update users, roles and passwords
+#   gateway:audit:read           read the caller's own audit entries
+#   gateway:audit:read:all       read every audit entry
+#   gateway:tools:read           read the tool catalog and server list
+#   gateway:tools:read:all       read the full catalog, including tools the
+#                                caller may not call
+
+roles:
+  admin:
+    description: Full access, including server management and audit log reads.
+    permissions:
+      - "gateway:servers:manage"
+      - "gateway:keys:manage"
+      - "gateway:keys:manage:own"
+      - "gateway:keys:read"
+      - "gateway:users:manage"
+      - "gateway:audit:read"
+      - "gateway:audit:read:all"
+      - "gateway:tools:read"
+      - "gateway:tools:read:all"
+      - "tools:*"
+
+  member:
+    description: Operator role — runs store operations, never administers the gateway.
+    permissions:
+      - "gateway:audit:read"
+      - "gateway:keys:manage:own"
+      - "gateway:keys:read"
+      - "gateway:tools:read"
+
+  viewer:
+    description: Read-only observer — may look at data, may not change it.
+    permissions:
+      - "gateway:audit:read"
+      - "gateway:tools:read"
+
+# Explicit per-role grants beyond wildcards (used by `member` and `viewer`).
+grants:
+  member:
+    - "tools:woocommerce:list_products"
+    - "tools:woocommerce:list_orders"
+    - "tools:woocommerce:get_order"
+    - "tools:inventory:*"
+    - "tools:shipping:track_shipment"
+    - "tools:shipping:get_shipment"
+    - "tools:shipping:list_shipments"
+    # The operator may move a shipment forward, but may not create one.
+    - "tools:shipping:update_shipment_status"
+  viewer:
+    - "tools:woocommerce:list_products"
+    - "tools:woocommerce:list_orders"
+    - "tools:woocommerce:get_order"
+    - "tools:inventory:*"
+    - "tools:shipping:track_shipment"
+    - "tools:shipping:get_shipment"
+    - "tools:shipping:list_shipments"
+
+# Deny rules always win over grants, within the role that declares them.
+deny:
+  member:
+    - "tools:woocommerce:create_product"
+    - "tools:woocommerce:update_order_status"
+    - "tools:shipping:create_shipment"
+  viewer:
+    - "tools:woocommerce:create_product"
+    - "tools:woocommerce:update_order_status"
+    - "tools:shipping:create_shipment"
+    - "tools:shipping:update_shipment_status"

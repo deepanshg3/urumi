@@ -1,0 +1,195 @@
+# Runs the MCP servers and the gateway alongside the local WooCommerce store.
+#
+#   ./scripts/store_setup.sh
+#   docker compose -f deploy/docker/mcp/compose.yaml --env-file .env up -d --build
+#
+# The MCP servers reach WooCommerce through the host port published by the
+# store compose file. Override WOOCOMMERCE_DOCKER_BASE_URL for a different
+# host (for example a remote store). WOOCOMMERCE_SIGNING_BASE_URL must match
+# the WordPress home URL used for OAuth 1.0a signature verification.
+#
+# Credentials come from the root .env (gitignored) and are injected at runtime,
+# never baked into the images. The gateway exposes one aggregated MCP endpoint
+# at http://localhost:8000/mcp (API-key auth) and a management API at /api.
+#
+# Bootstrap the first administrator once:
+#   BOOTSTRAP_ADMIN_EMAIL=... BOOTSTRAP_ADMIN_PASSWORD=... \
+#   docker compose -f deploy/docker/mcp/compose.yaml exec gateway \
+#     python -m services.gateway.bootstrap
+
+name: urumi-mcp
+
+x-mcp-common: &mcp-common
+  build:
+    context: ../../..
+    dockerfile: deploy/docker/mcp/Dockerfile
+  image: urumi/mcp-base:local
+  restart: unless-stopped
+  env_file:
+    - ../../../.env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  woocommerce-mcp:
+    <<: *mcp-common
+    build:
+      context: ../../..
+      dockerfile: deploy/docker/mcp/Dockerfile
+      args:
+        SERVICE: services.woocommerce_mcp
+        PORT: 8101
+    image: urumi/woocommerce-mcp:local
+    environment:
+      WOOCOMMERCE_MCP_HOST: 0.0.0.0
+      WOOCOMMERCE_MCP_PORT: 8101
+      WOOCOMMERCE_BASE_URL: ${WOOCOMMERCE_DOCKER_BASE_URL:-http://host.docker.internal:8080}
+      WOOCOMMERCE_SIGNING_BASE_URL: ${WOOCOMMERCE_SIGNING_BASE_URL:-http://localhost:8080}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,woocommerce-mcp:*,inventory-mcp:*,shipping-mcp:*,gateway:*}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8101:8101"
+
+  inventory-mcp:
+    <<: *mcp-common
+    build:
+      context: ../../..
+      dockerfile: deploy/docker/mcp/Dockerfile
+      args:
+        SERVICE: services.inventory_mcp
+        PORT: 8102
+    image: urumi/inventory-mcp:local
+    environment:
+      INVENTORY_MCP_HOST: 0.0.0.0
+      INVENTORY_MCP_PORT: 8102
+      WOOCOMMERCE_BASE_URL: ${WOOCOMMERCE_DOCKER_BASE_URL:-http://host.docker.internal:8080}
+      WOOCOMMERCE_SIGNING_BASE_URL: ${WOOCOMMERCE_SIGNING_BASE_URL:-http://localhost:8080}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,woocommerce-mcp:*,inventory-mcp:*,shipping-mcp:*,gateway:*}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      INVENTORY_LOW_STOCK_THRESHOLD: ${INVENTORY_LOW_STOCK_THRESHOLD:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8102:8102"
+
+  shipping-mcp:
+    <<: *mcp-common
+    build:
+      context: ../../..
+      dockerfile: deploy/docker/mcp/Dockerfile
+      args:
+        SERVICE: services.shipping_mcp
+        PORT: 8103
+    image: urumi/shipping-mcp:local
+    environment:
+      SHIPPING_MCP_HOST: 0.0.0.0
+      SHIPPING_MCP_PORT: 8103
+      SHIPPING_DATABASE_URL: sqlite+aiosqlite:///./data/shipping.db
+      WOOCOMMERCE_BASE_URL: ${WOOCOMMERCE_DOCKER_BASE_URL:-http://host.docker.internal:8080}
+      WOOCOMMERCE_SIGNING_BASE_URL: ${WOOCOMMERCE_SIGNING_BASE_URL:-http://localhost:8080}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,woocommerce-mcp:*,inventory-mcp:*,shipping-mcp:*,gateway:*}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      SHIPPING_MOCK_MODE: ${SHIPPING_MOCK_MODE:-simulated}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8103:8103"
+    volumes:
+      - shipping-data:/app/data
+
+  gateway:
+    <<: *mcp-common
+    build:
+      context: ../../..
+      dockerfile: deploy/docker/mcp/Dockerfile
+      args:
+        SERVICE: services.gateway
+        PORT: 8000
+        EXTRAS: mcp,postgres
+    image: urumi/gateway:local
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8000
+      DATABASE_URL: sqlite+aiosqlite:///./data/gateway.db
+      GATEWAY_SERVERS_CONFIG: /app/config/servers.docker.yaml
+      GATEWAY_ALLOWED_HOSTS: ${GATEWAY_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,gateway:*}
+      GATEWAY_ALLOWED_ORIGINS: ${GATEWAY_ALLOWED_ORIGINS:-http://localhost:*}
+      GATEWAY_CORS_ORIGINS: ${GATEWAY_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      GATEWAY_ALLOWED_UPSTREAM_HOSTS: ${GATEWAY_ALLOWED_UPSTREAM_HOSTS:-woocommerce-mcp,inventory-mcp,shipping-mcp,127.0.0.1,localhost}
+      GATEWAY_REFRESH_INTERVAL_SECONDS: ${GATEWAY_REFRESH_INTERVAL_SECONDS:-30}
+      GATEWAY_AUDIT_ENABLED: ${GATEWAY_AUDIT_ENABLED:-true}
+      # Assessment demo mode: disabled unless explicitly enabled. Both the
+      # mode and the acknowledgement must be set, and never in production.
+      GATEWAY_DEMO_MODE: ${GATEWAY_DEMO_MODE:-false}
+      GATEWAY_DEMO_ACK: ${GATEWAY_DEMO_ACK:-false}
+      GATEWAY_DEPLOYMENT_ENV: ${GATEWAY_DEPLOYMENT_ENV:-development}
+      GATEWAY_DEMO_ALLOW_REMOTE: ${GATEWAY_DEMO_ALLOW_REMOTE:-false}
+      GATEWAY_DEMO_ORIGINS: ${GATEWAY_DEMO_ORIGINS:-}
+      # GATEWAY_SECRET_KEY / BOOTSTRAP_ADMIN_* are intentionally NOT listed
+      # here: an `environment:` entry always overrides `env_file:`, so an empty
+      # interpolation default would clobber the real values from the root .env.
+      # They are read from `env_file: ../../../.env` instead.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    volumes:
+      - gateway-data:/app/data
+    depends_on:
+      woocommerce-mcp:
+        condition: service_healthy
+      inventory-mcp:
+        condition: service_healthy
+      shipping-mcp:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: ../../..
+      dockerfile: deploy/docker/agent/Dockerfile
+    image: urumi/agent:local
+    restart: unless-stopped
+    env_file:
+      - ../../../.env
+    environment:
+      AGENT_HOST: 0.0.0.0
+      AGENT_PORT: 8200
+      # Shares the gateway database so the agent can validate browser sessions
+      # and mint short-lived delegated API keys for the signed-in user.
+      DATABASE_URL: sqlite+aiosqlite:///./data/gateway.db
+      AGENT_GATEWAY_MCP_URL: http://gateway:8000/mcp
+      AGENT_CORS_ORIGINS: ${AGENT_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # GEMINI_*/LANGSMITH_* are intentionally NOT listed here: an
+      # `environment:` entry always overrides `env_file:`, so an empty
+      # interpolation default would silently replace the real API key (and the
+      # configured model) with an empty string. They are read from
+      # `env_file: ../../../.env` instead.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8200:8200"
+    volumes:
+      - gateway-data:/app/data
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: ../../..
+      dockerfile: apps/dashboard/Dockerfile
+    image: urumi/dashboard:local
+    restart: unless-stopped
+    environment:
+      GATEWAY_UPSTREAM: gateway:8000
+      AGENT_UPSTREAM: agent:8200
+    ports:
+      - "5173:80"
+    # nginx resolves the upstream names once at start-up, so it must not start
+    # before the gateway and the agent are actually serving.
+    depends_on:
+      gateway:
+        condition: service_healthy
+      agent:
+        condition: service_healthy
+
+volumes:
+  gateway-data:
+  shipping-data:

@@ -1,0 +1,51 @@
+Urumi MCP Gateway platform has been deployed.
+
+Components (release {{ .Release.Name }} in namespace {{ .Release.Namespace }}):
+  - gateway    : {{ include "urumi.fullname" . }}-gateway:{{ .Values.gateway.service.port }}
+  - agent      : {{ include "urumi.fullname" . }}-agent:{{ .Values.agent.service.port }}
+  - dashboard  : {{ include "urumi.fullname" . }}-dashboard:{{ .Values.dashboard.service.port }}
+  {{- if .Values.woocommerceMcp.enabled }}
+  - woocommerce-mcp : {{ include "urumi.fullname" . }}-woocommerce-mcp:8101
+  {{- end }}
+  {{- if .Values.inventoryMcp.enabled }}
+  - inventory-mcp   : {{ include "urumi.fullname" . }}-inventory-mcp:8102
+  {{- end }}
+  {{- if .Values.shippingMcp.enabled }}
+  - shipping-mcp    : {{ include "urumi.fullname" . }}-shipping-mcp:8103
+  {{- end }}
+  {{- if .Values.woocommerce.enabled }}
+  - wordpress  : {{ include "urumi.fullname" . }}-wordpress:80
+  - mariadb    : {{ include "urumi.fullname" . }}-mariadb:3306
+  {{- end }}
+  {{- if and .Values.database.bundled (not .Values.database.url) }}
+  - postgres   : {{ include "urumi.fullname" . }}-postgres:5432
+  {{- end }}
+
+Check status:
+  kubectl -n {{ .Release.Namespace }} get pods
+
+Access the dashboard:
+{{- if .Values.ingress.enabled }}
+  http://{{ .Values.ingress.host }}{{- if .Values.ingress.tls.enabled }} (https once TLS is configured){{- end }}
+{{- else if eq .Values.dashboard.service.type "NodePort" }}
+  http://<node-ip>:{{ .Values.dashboard.service.nodePort }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "urumi.fullname" . }}-dashboard 5173:{{ .Values.dashboard.service.port }}
+  then open http://localhost:5173
+{{- end }}
+
+Initial administrator: {{ .Values.gateway.bootstrapAdmin.email }}
+
+{{- if and .Values.woocommerce.enabled (not .Values.secrets.woocommerceConsumerKey) }}
+
+The bundled WooCommerce store still needs to be provisioned. Run:
+  scripts/k8s/seed-store.sh
+which installs WooCommerce, creates the seed products, generates REST keys and
+updates this release so the WooCommerce/Inventory/Shipping MCP servers become ready.
+{{- end }}
+
+{{- if not .Values.agent.langsmith.enabled }}
+
+LangSmith tracing is disabled (agent.langsmith.enabled=false). Enable it with
+  --set agent.langsmith.enabled=true --set-string secrets.langsmithApiKey=...
+{{- end }}

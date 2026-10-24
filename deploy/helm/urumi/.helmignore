@@ -1,0 +1,8 @@
+.DS_Store
+.git
+.gitignore
+*.tmproj
+.helmignore
+# Ignore local values overrides that may contain secrets
+values-*.local.yaml
+secrets*.yaml

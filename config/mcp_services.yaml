@@ -1,0 +1,32 @@
+# Configuration for the MCP services (WooCommerce + Inventory).
+# Secrets are NOT stored here — they come from environment variables (see .env.example).
+
+logging:
+  level: ${LOG_LEVEL}              # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+woocommerce:
+  base_url: ${WOOCOMMERCE_BASE_URL}       # e.g. http://localhost:8080
+  auth_mode: ${WOOCOMMERCE_AUTH_MODE}     # auto | basic | oauth1
+  signing_base_url: ${WOOCOMMERCE_SIGNING_BASE_URL}  # WordPress home URL for OAuth1
+  timeout_seconds: ${WOOCOMMERCE_TIMEOUT_SECONDS}
+  default_page_size: ${WOOCOMMERCE_DEFAULT_PAGE_SIZE}
+  max_page_size: ${WOOCOMMERCE_MAX_PAGE_SIZE}
+  max_retries: ${WOOCOMMERCE_MAX_RETRIES}
+  retry_backoff_seconds: ${WOOCOMMERCE_RETRY_BACKOFF_SECONDS}
+
+inventory:
+  low_stock_threshold: ${INVENTORY_LOW_STOCK_THRESHOLD}
+  summary_max_products: ${INVENTORY_SUMMARY_MAX_PRODUCTS}
+  summary_scan_page_size: ${INVENTORY_SUMMARY_SCAN_PAGE_SIZE}
+
+shipping_mock:
+  mode: ${SHIPPING_MOCK_MODE}              # simulated | degraded | failing
+  failure_rate: ${SHIPPING_MOCK_FAILURE_RATE}
+  default_carrier: ${SHIPPING_DEFAULT_CARRIER}
+  tracking_prefix: ${SHIPPING_TRACKING_PREFIX}
+  delivery_days_min: ${SHIPPING_DELIVERY_DAYS_MIN}
+  delivery_days_max: ${SHIPPING_DELIVERY_DAYS_MAX}
+  database_url: ${SHIPPING_DATABASE_URL}
+  allow_multiple_shipments_per_order: ${SHIPPING_ALLOW_MULTIPLE_PER_ORDER}
+  timeout_seconds: ${SHIPPING_TIMEOUT_SECONDS}
+  max_retries: ${SHIPPING_MAX_RETRIES}

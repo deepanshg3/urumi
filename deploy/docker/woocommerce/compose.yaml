@@ -1,0 +1,85 @@
+# Local development store: WordPress + WooCommerce + MariaDB.
+#
+# Usage (from the repository root):
+#   ./scripts/store_setup.sh          # first-time setup + seed
+#   docker compose -f deploy/docker/woocommerce/compose.yaml --env-file deploy/docker/woocommerce/.env up -d
+#   docker compose -f deploy/docker/woocommerce/compose.yaml --env-file deploy/docker/woocommerce/.env down
+#
+# `down` keeps the named volumes (database + WordPress content). Only `down -v`
+# deletes data, and that is intentionally never used by the project scripts.
+
+name: urumi-woocommerce
+
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${STORE_DB_NAME:-wordpress}
+      MARIADB_USER: ${STORE_DB_USER:-wordpress}
+      MARIADB_PASSWORD: ${STORE_DB_PASSWORD:?set STORE_DB_PASSWORD in deploy/docker/woocommerce/.env}
+      MARIADB_ROOT_PASSWORD: ${STORE_DB_ROOT_PASSWORD:?set STORE_DB_ROOT_PASSWORD in deploy/docker/woocommerce/.env}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  wordpress:
+    image: wordpress:7.0-apache
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${STORE_PORT:-8080}:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${STORE_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${STORE_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${STORE_DB_PASSWORD:?set STORE_DB_PASSWORD in deploy/docker/woocommerce/.env}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('DISALLOW_FILE_EDIT', true);
+        define('WP_AUTO_UPDATE_CORE', false);
+    volumes:
+      - wp_data:/var/www/html
+      # The Urumi Supply storefront theme is mounted read-only so it can be
+      # edited without rebuilding the image or touching the WordPress volume.
+      - ./theme/urumi-supply:/var/www/html/wp-content/themes/urumi-supply:ro
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/wp-login.php') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+
+  # One-shot WP-CLI helper. Not started by `up`; invoked with `docker compose run`.
+  cli:
+    image: wordpress:cli-php8.4
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${STORE_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${STORE_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${STORE_DB_PASSWORD:?set STORE_DB_PASSWORD in deploy/docker/woocommerce/.env}
+      HOME: /tmp
+    volumes:
+      - wp_data:/var/www/html
+      - ./theme/urumi-supply:/var/www/html/wp-content/themes/urumi-supply:ro
+    # Match the apache image's www-data uid/gid so WP-CLI can write the
+    # shared WordPress volume.
+    user: "33:33"
+    entrypoint: ["wp"]
+    command: ["--info"]
+    restart: "no"
+
+volumes:
+  db_data:
+    name: urumi-woocommerce_db_data
+  wp_data:
+    name: urumi-woocommerce_wp_data

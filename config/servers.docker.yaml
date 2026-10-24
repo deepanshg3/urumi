@@ -1,0 +1,30 @@
+# Upstream MCP server registry for the Docker Compose stack.
+#
+# The gateway runs inside the Compose network, so it reaches the MCP servers by
+# their service names instead of loopback. Point the gateway at this file:
+#   GATEWAY_SERVERS_CONFIG=/app/config/servers.docker.yaml
+
+servers:
+  - id: woocommerce
+    name: WooCommerce MCP
+    description: Products and orders via the WooCommerce REST API.
+    transport: streamable-http
+    url: http://woocommerce-mcp:8101/mcp
+    health_url: http://woocommerce-mcp:8101/health/ready
+    enabled: true
+
+  - id: inventory
+    name: Inventory MCP
+    description: Stock lookup, low-stock detection, inventory summaries, reorder recommendations.
+    transport: streamable-http
+    url: http://inventory-mcp:8102/mcp
+    health_url: http://inventory-mcp:8102/health/ready
+    enabled: true
+
+  - id: shipping
+    name: Shipping and Fulfillment MCP
+    description: Shipment records, tracking status, pending fulfillments (mock provider).
+    transport: streamable-http
+    url: http://shipping-mcp:8103/mcp
+    health_url: http://shipping-mcp:8103/health/ready
+    enabled: true

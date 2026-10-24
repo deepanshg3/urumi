@@ -1,0 +1,55 @@
+# Environments
+.venv/
+venv/
+env/
+
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Local data (SQLite gateway DB, WooCommerce/WordPress volumes)
+data/
+*.sqlite3
+*.db
+deploy/docker/woocommerce/.catalog-images.json
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Kubernetes / Helm local artifacts
+deploy/helm/**/charts/
+*.kubeconfig
+kubeconfig
+
+# Generated local Kind credentials
+.urumi-kind-credentials
+*.tgz
+
+# Assessment account credentials (generated locally, never committed)
+assessment-credentials.txt
+assessment-credentials-*.txt
+assessment-accounts.json
+.assessment-accounts.json

@@ -1,0 +1,145 @@
+{{- if .Values.woocommerce.enabled }}
+{{- $full := include "urumi.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-wordpress
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wordpress
+spec:
+  type: {{ (.Values.woocommerce.wordpress.service | default dict).type | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/name: {{ include "urumi.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: wordpress
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      {{- $wpSvc := .Values.woocommerce.wordpress.service | default dict }}
+      {{- if and (eq ($wpSvc.type | default "ClusterIP") "NodePort") $wpSvc.nodePort }}
+      nodePort: {{ $wpSvc.nodePort }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-wordpress
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wordpress
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "urumi.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: wordpress
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "urumi.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: wordpress
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $theme := .Values.woocommerce.wordpress.theme | default dict }}
+      {{- if $theme.enabled }}
+      initContainers:
+        - name: urumi-supply-theme
+          image: {{ include "urumi.image" (list . $theme.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "cp -R /theme/urumi-supply/. /theme-target/ && chmod -R a+rX /theme-target"]
+          volumeMounts:
+            - name: theme
+              mountPath: /theme-target
+      {{- end }}
+      containers:
+        - name: wordpress
+          image: {{ include "urumi.image" (list . .Values.woocommerce.wordpress.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: "{{ $full }}-mariadb:3306"
+            - name: WORDPRESS_DB_NAME
+              value: {{ .Values.woocommerce.mariadb.auth.database | quote }}
+            - name: WORDPRESS_DB_USER
+              value: {{ .Values.woocommerce.mariadb.auth.username | quote }}
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "urumi.secretName" . }}
+                  key: mariadb-password
+            {{- range $key, $value := .Values.woocommerce.wordpress.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.woocommerce.wordpress.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html
+            {{- if $theme.enabled }}
+            - name: theme
+              mountPath: /var/www/html/wp-content/themes/urumi-supply
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if $theme.enabled }}
+        - name: theme
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.woocommerce.wordpress.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $full }}-wordpress
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+---
+{{- if .Values.woocommerce.wordpress.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $full }}-wordpress
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wordpress
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if .Values.woocommerce.wordpress.persistence.storageClass }}
+  storageClassName: {{ .Values.woocommerce.wordpress.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.woocommerce.wordpress.persistence.size }}
+{{- end }}
+{{- end }}

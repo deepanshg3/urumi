@@ -1,0 +1,23 @@
+# Keep build context small and free of secrets/development artifacts.
+.git
+.gitignore
+.venv
+venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+docs
+apps
+deploy
+node_modules
+data
+*.log
+*.db
+*.sqlite3

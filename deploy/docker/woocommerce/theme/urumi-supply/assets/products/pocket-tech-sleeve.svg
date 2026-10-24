@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#F7F5EF"/>
+      <stop offset="1" stop-color="#E5EAE2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <circle cx="400" cy="400" r="250" fill="url(#glow)"/>
+  <ellipse cx="400" cy="792" rx="190" ry="22" fill="#244A3C" opacity="0.10"/>
+  <rect x="200" y="400" width="400" height="290" rx="26" fill="#D9D3C5" stroke="#244A3C" stroke-width="5"/>
+  <path d="M200 460h400" stroke="#244A3C" stroke-width="5" opacity="0.5"/>
+  <rect x="242" y="500" width="316" height="150" rx="14" fill="#244A3C" opacity="0.92"/>
+  <rect x="262" y="520" width="276" height="110" rx="8" fill="#9CD3B7" opacity="0.28"/>
+  <circle cx="640" cy="430" r="10" fill="#B87926"/>
+  <path d="M400 400v-40" stroke="#244A3C" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <path d="M300 600h200" stroke="#9CD3B7" stroke-width="6" stroke-linecap="round" opacity="0.8"/><path d="M170 790h460" stroke="#B9C4B7" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+</svg>

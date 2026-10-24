@@ -1,0 +1,92 @@
+# Kind (local Kubernetes) overlay.
+#
+# Uses the locally-built images (loaded into the cluster by
+# scripts/k8s/build-and-load.sh) and exposes the dashboard through a NodePort
+# mapped to the host by deploy/kind/kind-config.yaml.
+#
+# Secrets are NOT stored here: scripts/k8s/deploy-kind.sh generates random
+# values and passes them with --set / --set-string, and reads GEMINI_API_KEY
+# from the local .env if present.
+
+global: {}
+
+image:
+  pullPolicy: IfNotPresent
+
+database:
+  bundled: true
+  image:
+    tag: "16-alpine"
+
+gateway:
+  image:
+    repository: urumi/gateway
+    tag: local
+  bootstrapAdmin:
+    email: admin@urumi.local
+  env:
+    # Keep a mutating tool out of the model's tool list while still allowing
+    # authorized direct calls (mirrors the Compose demo configuration).
+    GATEWAY_MODEL_HIDDEN_TOOLS: '["shipping__create_shipment"]'
+    # Local assessment deployment: enable no-login persona switching. The
+    # gateway still requires the acknowledgement and refuses to start with
+    # GATEWAY_DEPLOYMENT_ENV=production.
+    GATEWAY_DEMO_MODE: "true"
+    GATEWAY_DEMO_ACK: "true"
+    GATEWAY_DEPLOYMENT_ENV: assessment
+    GATEWAY_DEMO_ORIGINS: "http://localhost:8088,http://127.0.0.1:8088"
+
+agent:
+  gemini:
+    model: gemini-3.5-flash-lite
+  env:
+    GEMINI_MAX_RETRIES: "0"
+    AGENT_MAX_ITERATIONS: "4"
+    AGENT_MAX_TOOL_CALLS: "4"
+  image:
+    repository: urumi/agent
+    tag: local
+  langsmith:
+    enabled: false
+
+dashboard:
+  image:
+    repository: urumi/dashboard
+    tag: local
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+
+woocommerceMcp:
+  image:
+    repository: urumi/woocommerce-mcp
+    tag: local
+
+inventoryMcp:
+  image:
+    repository: urumi/inventory-mcp
+    tag: local
+
+shippingMcp:
+  image:
+    repository: urumi/shipping-mcp
+    tag: local
+
+woocommerce:
+  enabled: true
+  publicUrl: http://localhost:8081
+  wordpress:
+    image:
+      repository: wordpress
+      tag: "7.0-apache"
+    service:
+      type: NodePort
+      nodePort: 30081
+  mariadb:
+    image:
+      repository: mariadb
+      tag: "11.4"
+
+ingress:
+  enabled: false

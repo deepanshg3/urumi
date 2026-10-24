@@ -1,0 +1,20 @@
+/*
+Theme Name: Urumi Supply
+Theme URI: https://urumi.dev/store
+Author: Urumi
+Description: A warm, editorial storefront theme for the Urumi Supply demo store. Classic PHP theme with WooCommerce support, self-hosted fonts, and an SVG-led product catalog.
+Version: 1.0.0
+Requires at least: 6.5
+Tested up to: 7.0
+Requires PHP: 8.0
+License: GPL-2.0-or-later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: urumi-supply
+Tags: e-commerce, custom-colors, custom-menu, featured-images, translation-ready
+*/
+
+/*
+ * The full stylesheet lives in assets/css/theme.css and is enqueued from
+ * functions.php, so WordPress can serve it as a versioned, cacheable asset.
+ * This file only carries the theme header WordPress requires.
+ */

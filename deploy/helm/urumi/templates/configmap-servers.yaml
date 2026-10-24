@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "urumi.fullname" . }}-servers
+  labels:
+    {{- include "urumi.labels" . | nindent 4 }}
+data:
+  servers.yaml: |
+    # Rendered by the urumi Helm chart. Upstream MCP servers as cluster services.
+    servers:
+      {{- if .Values.woocommerceMcp.enabled }}
+      - id: woocommerce
+        name: WooCommerce MCP
+        description: Products and orders via the WooCommerce REST API.
+        transport: streamable-http
+        url: http://{{ include "urumi.fullname" . }}-woocommerce-mcp:8101/mcp
+        health_url: http://{{ include "urumi.fullname" . }}-woocommerce-mcp:8101/health/ready
+        enabled: true
+      {{- end }}
+      {{- if .Values.inventoryMcp.enabled }}
+      - id: inventory
+        name: Inventory MCP
+        description: Stock lookup, low-stock detection, inventory summaries, reorder recommendations.
+        transport: streamable-http
+        url: http://{{ include "urumi.fullname" . }}-inventory-mcp:8102/mcp
+        health_url: http://{{ include "urumi.fullname" . }}-inventory-mcp:8102/health/ready
+        enabled: true
+      {{- end }}
+      {{- if .Values.shippingMcp.enabled }}
+      - id: shipping
+        name: Shipping and Fulfillment MCP
+        description: Shipment records, tracking status, pending fulfillments (mock provider).
+        transport: streamable-http
+        url: http://{{ include "urumi.fullname" . }}-shipping-mcp:8103/mcp
+        health_url: http://{{ include "urumi.fullname" . }}-shipping-mcp:8103/health/ready
+        enabled: true
+      {{- end }}

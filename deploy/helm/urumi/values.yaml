@@ -1,0 +1,236 @@
+# Default values for the Urumi platform chart.
+#
+# Secrets below are PLACEHOLDERS ONLY. Supply real values with --set/--set-string,
+# a values file kept out of git, or a pre-created Secret via secrets.existingSecret.
+# Never commit real credentials.
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  pullPolicy: IfNotPresent
+
+# Shared gateway/agent database.
+database:
+  # bundled=true runs an in-cluster PostgreSQL StatefulSet.
+  # bundled=false requires database.url (external PostgreSQL DSN) and no pod is created.
+  bundled: true
+  url: ""
+  auth:
+    username: urumi
+    database: urumi
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+gateway:
+  enabled: true
+  image:
+    repository: urumi/gateway
+    tag: local
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  bootstrapAdmin:
+    email: admin@urumi.local
+  # Extra upstream hosts allowed by the SSRF guard. Bundled MCP service names
+  # are added automatically.
+  allowedUpstreamHosts: []
+  # Extra browser origins allowed by CORS. The ingress host is added automatically.
+  corsOrigins: []
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+agent:
+  enabled: true
+  image:
+    repository: urumi/agent
+    tag: local
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8200
+  gemini:
+    model: gemini-2.5-flash
+    temperature: 0.2
+    maxOutputTokens: 2048
+    requestTimeoutSeconds: 30
+  langsmith:
+    enabled: false
+    project: urumi-mcp-gateway
+    endpoint: ""
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+dashboard:
+  enabled: true
+  image:
+    repository: urumi/dashboard
+    tag: local
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+    # Set for NodePort access (used by the Kind overlay).
+    nodePort: null
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+woocommerceMcp:
+  enabled: true
+  image:
+    repository: urumi/woocommerce-mcp
+    tag: local
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+inventoryMcp:
+  enabled: true
+  image:
+    repository: urumi/inventory-mcp
+    tag: local
+  lowStockThreshold: 5
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+shippingMcp:
+  enabled: true
+  image:
+    repository: urumi/shipping-mcp
+    tag: local
+  mockMode: simulated
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# Bundled WooCommerce store. Disable and point the MCP servers at an external
+# store with woocommerceMcp.env.WOOCOMMERCE_BASE_URL instead.
+woocommerce:
+  enabled: true
+  # Public URL of the store as WordPress's `home`/`siteurl` option is set to.
+  # OAuth 1.0a signatures are computed against this URL, so the MCP servers
+  # must sign with it while connecting over the internal Service address.
+  # Set this to the store URL reachable by clients (e.g. an ingress host).
+  publicUrl: ""
+  wordpress:
+    image:
+      repository: wordpress
+      tag: "7.0-apache"
+    # The Urumi Supply theme is copied into the pod by an init container and
+    # mounted read-only at wp-content/themes/urumi-supply.
+    theme:
+      enabled: true
+      image:
+        repository: urumi/urumi-supply-theme
+        tag: local
+    service:
+      type: ClusterIP
+      nodePort: null
+    persistence:
+      enabled: true
+      size: 2Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    env: {}
+  mariadb:
+    image:
+      repository: mariadb
+      tag: "11.4"
+    auth:
+      username: wordpress
+      database: wordpress
+    persistence:
+      enabled: true
+      size: 2Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: urumi.local
+  tls:
+    enabled: false
+    secretName: ""
+
+# Secrets. Leave existingSecret empty to let the chart manage a Secret, or set it
+# to reference one you created out of band (the keys below must exist in it).
+secrets:
+  existingSecret: ""
+  gatewaySecretKey: "change-me-to-a-long-random-value"
+  bootstrapAdminPassword: "change-me-admin-password"
+  geminiApiKey: ""
+  langsmithApiKey: ""
+  woocommerceConsumerKey: ""
+  woocommerceConsumerSecret: ""
+  postgresPassword: "change-me-postgres-password"
+  mariadbRootPassword: "change-me-root-password"
+  mariadbPassword: "change-me-wordpress-password"

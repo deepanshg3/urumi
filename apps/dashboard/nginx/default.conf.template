@@ -1,0 +1,57 @@
+# Same-origin reverse proxy. The nginx image runs envsubst over this template
+# at startup, replacing GATEWAY_UPSTREAM and AGENT_UPSTREAM.
+#
+# Routing:
+#   /api/*      -> gateway management API
+#   /mcp        -> gateway (Streamable HTTP MCP; buffering disabled)
+#   /agent/api/ -> chat agent HTTP API
+#   everything else -> the static single-page dashboard
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    client_max_body_size 1m;
+
+    location /api/ {
+        proxy_pass http://${GATEWAY_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /mcp {
+        proxy_pass http://${GATEWAY_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    location /agent/api/ {
+        proxy_pass http://${AGENT_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

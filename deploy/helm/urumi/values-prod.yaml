@@ -1,0 +1,98 @@
+# Production-like k3s overlay.
+#
+# Assumes images were pushed to a registry (set global.imageRegistry or the
+# per-component repositories) and that secrets exist out of band. Prefer an
+# explicit Secret (secrets.existingSecret) managed by your secret manager over
+# passing credentials on the command line.
+#
+#   kubectl create secret generic urumi-secrets \
+#     --from-literal=gateway-secret-key=... \
+#     --from-literal=bootstrap-admin-password=... \
+#     --from-literal=gemini-api-key=... \
+#     --from-literal=langsmith-api-key=... \
+#     --from-literal=woocommerce-consumer-key=... \
+#     --from-literal=woocommerce-consumer-secret=... \
+#     --from-literal=postgres-password=... \
+#     --from-literal=mariadb-root-password=... \
+#     --from-literal=mariadb-password=...
+#
+#   helm upgrade --install urumi deploy/helm/urumi \
+#     -n urumi --create-namespace -f deploy/helm/urumi/values-prod.yaml
+
+global:
+  # e.g. registry.example.com/urumi
+  imageRegistry: ""
+  imagePullSecrets: []
+
+image:
+  pullPolicy: IfNotPresent
+
+database:
+  # Set bundled=false and database.url to use a managed/external PostgreSQL.
+  bundled: true
+  url: ""
+  persistence:
+    size: 10Gi
+    storageClass: "local-path"
+
+gateway:
+  image:
+    tag: "0.1.0"
+  replicas: 2
+  bootstrapAdmin:
+    email: admin@urumi.local
+
+agent:
+  image:
+    tag: "0.1.0"
+  replicas: 2
+  langsmith:
+    enabled: false
+
+dashboard:
+  image:
+    tag: "0.1.0"
+  replicas: 2
+  service:
+    type: ClusterIP
+
+woocommerceMcp:
+  image:
+    tag: "0.1.0"
+
+inventoryMcp:
+  image:
+    tag: "0.1.0"
+
+shippingMcp:
+  image:
+    tag: "0.1.0"
+  persistence:
+    size: 5Gi
+    storageClass: "local-path"
+
+woocommerce:
+  enabled: true
+  # Public store URL (must match WordPress home/siteurl). Point an ingress at
+  # the wordpress Service and set this to that host, e.g. https://store.example.com.
+  publicUrl: ""
+  wordpress:
+    persistence:
+      size: 10Gi
+      storageClass: "local-path"
+  mariadb:
+    persistence:
+      size: 10Gi
+      storageClass: "local-path"
+
+ingress:
+  enabled: true
+  # k3s ships Traefik by default; change to nginx if you run ingress-nginx.
+  className: traefik
+  host: urumi.example.com
+  tls:
+    enabled: false
+    secretName: ""
+
+secrets:
+  existingSecret: urumi-secrets

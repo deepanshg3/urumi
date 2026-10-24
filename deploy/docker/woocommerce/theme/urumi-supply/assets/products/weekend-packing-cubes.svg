@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#F7F5EF"/>
+      <stop offset="1" stop-color="#E5EAE2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <circle cx="400" cy="400" r="250" fill="url(#glow)"/>
+  <ellipse cx="400" cy="792" rx="190" ry="22" fill="#244A3C" opacity="0.10"/>
+  <rect x="230" y="620" width="340" height="150" rx="20" fill="#3E7860" stroke="#244A3C" stroke-width="5"/>
+  <rect x="262" y="470" width="276" height="150" rx="20" fill="#9CD3B7" stroke="#244A3C" stroke-width="5"/>
+  <rect x="294" y="320" width="212" height="150" rx="20" fill="#E4D7C1" stroke="#244A3C" stroke-width="5"/>
+  <path d="M400 320v150M262 470h276M230 620h340" stroke="#244A3C" stroke-width="4" opacity="0.45"/>
+  <rect x="376" y="360" width="48" height="16" rx="8" fill="#244A3C" opacity="0.55"/>
+  <rect x="376" y="510" width="48" height="16" rx="8" fill="#244A3C" opacity="0.45"/>
+  <rect x="376" y="660" width="48" height="16" rx="8" fill="#244A3C" opacity="0.45"/>
+  <path d="M300 640h120" stroke="#9CD3B7" stroke-width="6" stroke-linecap="round" opacity="0.7"/><path d="M170 790h460" stroke="#B9C4B7" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+</svg>
