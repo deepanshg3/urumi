@@ -14,15 +14,16 @@ services:
         sync: false
       - key: DATABASE_URL
         value: sqlite+aiosqlite:////app/data/gateway.db
-      # Assessment/demo mode - keep disabled by default
+      # Assessment/demo mode - values are managed in the Render dashboard
+      # (sync: false) so Blueprint syncs don't reset them to false.
       - key: GATEWAY_DEMO_MODE
-        value: false
+        sync: false
       - key: GATEWAY_DEMO_ACK
-        value: false
+        sync: false
       - key: GATEWAY_DEPLOYMENT_ENV
         value: development
       - key: GATEWAY_DEMO_ALLOW_REMOTE
-        value: false
+        sync: false
       # WooCommerce (optional - without them, WooCommerce MCP will report not ready)
       - key: WOOCOMMERCE_BASE_URL
         sync: false

@@ -142,7 +142,12 @@ def demo_request_allowed(
         return False
     if origin:
         allowed = {item.rstrip("/") for item in settings.demo_origin_list}
-        if origin.rstrip("/") not in allowed:
+        # Same-origin requests (dashboard served behind the same host, e.g.
+        # the single-container Render deploy) are always acceptable.
+        same_origin = bool(host_header) and (
+            urlsplit(origin).netloc.lower() == host_header.strip().lower()
+        )
+        if origin.rstrip("/") not in allowed and not same_origin:
             return False
     if settings.demo_allow_remote:
         return True
