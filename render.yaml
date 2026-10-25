@@ -5,7 +5,7 @@ services:
     plan: free
     dockerfilePath: ./deploy/render/Dockerfile
     dockerContext: .
-    healthCheckPath: /api/health/ready
+    healthCheckPath: /healthz
     envVars:
       - key: PORT
         value: 10000
